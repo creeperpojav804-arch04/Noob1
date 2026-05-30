@@ -1,0 +1,277 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake Classic</title>
+
+<style>
+
+@font-face {
+    font-family: 'pelak';
+    src: url('https://rskyer.github.io/AI_everywhere/o/pelak.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+html,body{
+    margin:0;
+    padding:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+font-family: 'pelak'
+}
+
+body{
+    background:#222;
+    color:#fff;
+    font-family:tahoma;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+/* مهم: جلوگیری از برعکس شدن UI در RTL */
+#phone{
+    direction:ltr;
+    background:#777;
+    padding:20px;
+    border-radius:20px;
+font-family: 'pelak'
+}
+
+canvas{
+    background:#9bbc0f;
+    border:8px solid #306230;
+    box-sizing:border-box;
+
+font-family: 'pelak'
+}
+
+.controls{
+    display:grid;
+    grid-template-columns:70px 70px 70px;
+    gap:6px;
+    justify-content:center;
+    margin-top:10px;
+
+font-family: 'pelak'
+}
+
+button{
+    padding:10px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:18px;
+font-family: 'pelak'
+}
+
+.up{grid-column:2}
+.left{grid-column:1}
+.down{grid-column:2}
+.right{grid-column:3}
+
+#score{
+    text-align:center;
+    margin-bottom:8px;
+    font-size:20px;
+font-family: 'pelak'
+}
+</style>
+</head>
+
+<body>
+
+<div>
+    <div id="score">امتیاز: 0</div>
+
+    <div id="phone">
+
+        <canvas id="game" width="300" height="300"></canvas>
+
+        <div style="text-align:center;margin-top:8px">
+            <button onclick="pauseGame()">⏸ توقف</button>
+            <button onclick="restartGame()">🔄 شروع مجدد</button>
+        </div>
+
+        <div class="controls">
+            <button class="up" onclick="changeDir('up')">▲</button>
+            <button class="left" onclick="changeDir('left')">◀</button>
+            <button class="down" onclick="changeDir('down')">▼</button>
+            <button class="right" onclick="changeDir('right')">▶</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const grid = 15;
+const tileCount = canvas.width / grid;
+
+let snake;
+let food;
+let score;
+let direction;
+let nextDirection;
+let gameInterval;
+let paused = false;
+
+function initGame(){
+
+    snake = [
+        {x:10,y:10},
+        {x:9,y:10},
+        {x:8,y:10}
+    ];
+
+    score = 0;
+    paused = false;
+
+    direction = "right";
+    nextDirection = "right";
+
+    document.getElementById("score").textContent = "امتیاز: " + score;
+
+    createFood();
+
+    clearInterval(gameInterval);
+    gameInterval = setInterval(gameLoop,120);
+
+    draw();
+}
+
+function createFood(){
+
+    do{
+        food = {
+            x:Math.floor(Math.random()*tileCount),
+            y:Math.floor(Math.random()*tileCount)
+        };
+    }while(
+        snake.some(p => p.x === food.x && p.y === food.y)
+    );
+}
+
+function gameLoop(){
+
+    if(paused) return;
+
+    direction = nextDirection;
+
+    const head = {x:snake[0].x, y:snake[0].y};
+
+    switch(direction){
+
+        case "up":
+            head.y--;
+            break;
+
+        case "down":
+            head.y++;
+            break;
+
+        case "left":
+            head.x--;
+            break;
+
+        case "right":
+            head.x++;
+            break;
+    }
+
+    if(
+        head.x < 0 ||
+        head.y < 0 ||
+        head.x >= tileCount ||
+        head.y >= tileCount
+    ){
+        gameOver();
+        return;
+    }
+
+    for(let i=0;i<snake.length;i++){
+        if(snake[i].x === head.x && snake[i].y === head.y){
+            gameOver();
+            return;
+        }
+    }
+
+    snake.unshift(head);
+
+    if(head.x === food.x && head.y === food.y){
+        score++;
+        document.getElementById("score").textContent = score;
+        createFood();
+    }else{
+        snake.pop();
+    }
+
+    draw();
+}
+
+function draw(){
+
+    ctx.fillStyle = "#9bbc0f";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle = "red";
+    ctx.fillRect(food.x * grid, food.y * grid, grid, grid);
+
+    ctx.fillStyle = "#0f380f";
+
+    snake.forEach(p=>{
+        ctx.fillRect(p.x * grid, p.y * grid, grid-1, grid-1);
+    });
+}
+
+function changeDir(newDir){
+
+    if(
+        (direction === "up" && newDir === "down") ||
+        (direction === "down" && newDir === "up") ||
+        (direction === "left" && newDir === "right") ||
+        (direction === "right" && newDir === "left")
+    ){
+        return;
+    }
+
+    nextDirection = newDir;
+}
+
+function pauseGame(){
+    paused = !paused;
+}
+
+function restartGame(){
+    clearInterval(gameInterval);
+    initGame();
+}
+
+function gameOver(){
+    clearInterval(gameInterval);
+    alert("بازی تمام شد\nامتیاز: " + score);
+    initGame();
+}
+
+document.addEventListener("keydown",(e)=>{
+
+    switch(e.key){
+        case "ArrowUp": changeDir("up"); break;
+        case "ArrowDown": changeDir("down"); break;
+        case "ArrowLeft": changeDir("left"); break;
+        case "ArrowRight": changeDir("right"); break;
+    }
+
+});
+
+initGame();
+
+</script>
+
+</body>
+</html>
