@@ -1,0 +1,234 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nokia Car Game Mobile Fixed</title>
+<style>
+body{margin:0;background:#111;color:#fff;text-align:center}
+#score{font-size:22px;margin:10px}
+canvas{border:4px solid #555;border-radius:8px;display:block;margin:auto}
+#topBtns{margin:10px}
+#controls{display:grid;grid-template-columns:80px 80px 80px;gap:8px;justify-content:center;margin-top:15px}
+button{padding:15px;font-size:22px;border:none;border-radius:10px;background:#333;color:#fff}
+</style>
+  <style>
+
+@font-face {
+    font-family: 'pelak';
+    src: url('https://rskyer.github.io/AI_everywhere/o/pelak.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+* {
+font-family: 'pelak'; }
+body { 
+font-family: 'pelak' }
+<style>
+</head>
+<body>
+<div id="score">Score: 0</div>
+<canvas id="game" width="320" height="500"></canvas>
+
+<div id="topBtns">
+<button id="pauseBtn">Pause</button>
+<button id="restartBtn">Restart</button>
+</div>
+
+<div id="controls">
+<div></div><button id="up">↑</button><div></div>
+<button id="left">←</button>
+<button id="down">↓</button>
+<button id="right">→</button>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const scoreEl=document.getElementById("score");
+
+let score=0, gameOver=false, paused=false;
+const player={x:145,y:420,w:30,h:55,speed:6};
+const keys={};
+let enemies=[], roadLines=[];
+
+function resetGame(){
+ score=0; gameOver=false; paused=false;
+ enemies=[]; roadLines=[];
+ player.x=145; player.y=420;
+ for(let i=0;i<12;i++) roadLines.push({y:i*50});
+ scoreEl.textContent="Score: 0";
+}
+resetGame();
+function drawCar(x,y,color){
+ ctx.fillStyle="rgba(0,0,0,.3)";
+ ctx.fillRect(x+3,y+3,30,55);
+ const g=ctx.createLinearGradient(x,y,x+30,y);
+ g.addColorStop(0,color); g.addColorStop(.5,"#ffffff33"); g.addColorStop(1,color);
+ ctx.fillStyle=g; ctx.fillRect(x,y,30,55);
+ ctx.fillStyle="#8fe8ff"; ctx.fillRect(x+6,y+12,18,10);
+}
+
+function spawnEnemy(){
+ const lanes=[55,145,235];
+ const laneIndex=Math.floor(Math.random()*3);
+ const laneX=lanes[laneIndex];
+
+ const blocked=enemies.some(e =>
+   Math.abs(e.x-laneX)<5 && e.y<120
+ );
+
+ if(blocked) return;
+
+ enemies.push({
+   x:laneX,
+   y:-60,
+   speed:3.5+Math.random()*1.5
+ });
+}
+
+// بررسی برخورد با بدنه ماشین دشمن
+function collision(a,b){
+ return a.x < b.x + 30 && 
+        a.x + a.w > b.x && 
+        a.y < b.y + 55 && 
+        a.y + a.h > b.y;
+}
+
+// بررسی برخورد با دیوارهای نامرئی کنار دشمنان کناری
+function checkInvisibleWalls(p) {
+    // عرض دیوار سبز واقعی
+    const realWallWidth = 20;
+
+    for (let e of enemies) {
+        // فقط دشمنانی که در ارتفاع بازیکن هستند بررسی شوند
+        // کمی حاشیه (buffer) می‌دهیم تا قبل از رسیدن کامل، راه بسته شود
+        if (p.y + p.h > e.y - 10 && p.y < e.y + 55 + 10) {
+            
+            // اگر دشمن در لاین چپ است (نزدیک دیوار چپ)
+            if (e.x < 100) {
+                // دیوار نامرئی در فضای خالی بین دیوار واقعی و ماشین دشمن
+                // اگر بازیکن وارد این فضا شد (یعنی سمت چپش کمتر از سمت راست دشمن بود)
+                if (p.x < e.x + 30 && p.x + p.w > realWallWidth) {                    // یعنی بازیکن دارد سعی می‌کند از بغل چپ دشمن رد شود
+                    // اینجا Game Over می‌کنیم چون راه بسته است
+                    return true;
+                }
+            }
+
+            // اگر دشمن در لاین راست است (نزدیک دیوار راست)
+            if (e.x > 200) {
+                // دیوار نامرئی در فضای خالی بین ماشین دشمن و دیوار واقعی راست
+                if (p.x + p.w > e.x && p.x < canvas.width - realWallWidth) {
+                    // یعنی بازیکن دارد سعی می‌کند از بغل راست دشمن رد شود
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function update(){
+ if(gameOver||paused) return;
+
+ if(keys.left) player.x-=player.speed;
+ if(keys.right) player.x+=player.speed;
+ if(keys.up) player.y-=player.speed;
+ if(keys.down) player.y+=player.speed;
+
+ // محدودیت معمولی زمین بازی
+ player.x=Math.max(20, Math.min(canvas.width-player.w-20, player.x));
+ player.y=Math.max(50, Math.min(canvas.height-player.h-10, player.y));
+
+ roadLines.forEach(l=>{l.y+=6;if(l.y>canvas.height) l.y=-50;});
+
+ if(Math.random()<0.012) spawnEnemy();
+
+ for(let i=enemies.length-1;i>=0;i--){
+   const e=enemies[i];
+   e.y+=e.speed;
+   
+   // 1. برخورد با خود ماشین دشمن -> Game Over
+   if(collision(player,e)) {
+       gameOver=true;
+   }
+   
+   // 2. تلاش برای رد شدن از دیوار نامرئی (کنار دشمنان کناری) -> Game Over
+   if(checkInvisibleWalls(player)) {
+       gameOver=true;
+   }
+
+   if(e.y>canvas.height){      enemies.splice(i,1);
+      score+=10;
+      scoreEl.textContent="Score: "+score;
+   }
+ }
+}
+
+function draw(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#444"; ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#0a5d0a";
+ ctx.fillRect(0,0,20,canvas.height);
+ ctx.fillRect(canvas.width-20,0,20,canvas.height);
+
+ roadLines.forEach(l=>{
+   ctx.fillStyle="#ff0";
+   ctx.fillRect(canvas.width/2-2,l.y,4,30);
+ });
+
+ drawCar(player.x,player.y,"#00cc66");
+ enemies.forEach(e=>drawCar(e.x,e.y,"#cc2222"));
+
+ if(paused){
+   ctx.fillStyle="rgba(0,0,0,.7)";
+   ctx.fillRect(0,0,canvas.width,canvas.height);
+   ctx.fillStyle="#fff";
+   ctx.font="30px Arial";
+   ctx.fillText("PAUSED",100,250);
+ }
+
+ if(gameOver){
+   ctx.fillStyle="rgba(0,0,0,.8)";
+   ctx.fillRect(0,0,canvas.width,canvas.height);
+   ctx.fillStyle="#fff";
+   ctx.font="30px Arial";
+   ctx.fillText("GAME OVER",70,250);
+ }
+}
+
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+loop();
+
+document.getElementById("pauseBtn").onclick=()=>paused=!paused;
+document.getElementById("restartBtn").onclick=resetGame;
+
+function bind(id,key){
+ const b=document.getElementById(id);
+ b.ontouchstart=(e)=>{e.preventDefault(); keys[key]=true;};
+ b.ontouchend=(e)=>{e.preventDefault(); keys[key]=false;};
+ b.onmousedown=()=>keys[key]=true; b.onmouseup=()=>keys[key]=false;
+ b.onmouseleave=()=>keys[key]=false;
+}
+
+bind("left","left");
+bind("right","right");
+bind("up","up");
+bind("down","down");
+
+document.addEventListener("keydown",e=>{
+ if(e.key==="ArrowLeft") keys.left=true;
+ if(e.key==="ArrowRight") keys.right=true;
+ if(e.key==="ArrowUp") keys.up=true;
+ if(e.key==="ArrowDown") keys.down=true;
+});
+
+document.addEventListener("keyup",e=>{
+ if(e.key==="ArrowLeft") keys.left=false;
+ if(e.key==="ArrowRight") keys.right=false;
+ if(e.key==="ArrowUp") keys.up=false;
+ if(e.key==="ArrowDown") keys.down=false;
+});
+</script>
+</body>
+</html>
