@@ -69,13 +69,13 @@ button:active{
 </head>
 <body>
 
-<div id="score">Score: 0</div>
+<div id="score">امتیاز شما: 0</div>
 
 <canvas id="game" width="320" height="500"></canvas>
 
 <div id="topBtns">
-    <button id="pauseBtn">Pause</button>
-    <button id="restartBtn">Restart</button>
+    <button id="pauseBtn">توقف</button>
+    <button id="restartBtn">ری‌استارت</button>
 </div>
 
 <div id="controls">
@@ -124,7 +124,7 @@ function resetGame(){
         roadLines.push({y:i*50});
     }
 
-    scoreEl.textContent = "Score: 0";
+    scoreEl.textContent = "امتیاز: 0";
 }
 
 resetGame();
@@ -259,7 +259,7 @@ function update(){
             score += 10;
 
             scoreEl.textContent =
-                "Score: " + score;
+                "امتیاز شما: " + score;
         }
     }
 }
@@ -337,7 +337,7 @@ function draw(){
         ctx.fillStyle = "#fff";
         ctx.font = "30px Arial";
         ctx.fillText(
-            "PAUSED",
+            "متوقف شد",
             100,
             250
         );
@@ -359,7 +359,7 @@ function draw(){
         ctx.font = "30px Arial";
 
         ctx.fillText(
-            "GAME OVER",
+            "بازی تمام شد!",
             65,
             250
         );
