@@ -1,0 +1,387 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nokia Ball Game - With Pause & Restart</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        canvas {
+            border: 2px solid #333;
+            background-color: #000;
+            display: block;
+        }
+        #scoreBoard {
+            margin-top: 10px;
+            font-size: 1.5em;
+            color: #333;
+        }
+        #gameOverScreen, #pauseScreen { /* اضافه شده */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 2em;
+        }
+        #pauseScreen { /* اضافه شده */
+            color: #0ff; /* رنگ متفاوت برای صفحه توقف */
+        }
+        #restartButton, #pauseRestartButton, #resumeButton { /* اضافه شده */            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        #resumeButton { /* اضافه شده */
+            background-color: #2196F3; /* رنگ متفاوت */
+        }
+        #mobileControls {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+            margin-top: 20px;
+        }
+        .controlBtn {
+            width: 100%;
+            height: 100%;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .controlBtn:active, .controlBtn.active {
+            background-color: #555;
+        }
+        #leftBtn { grid-column: 1; grid-row: 2; }
+        #rightBtn { grid-column: 3; grid-row: 2; }
+        #pauseButton { /* اضافه شده */
+            margin-top: 10px;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            cursor: pointer;
+            background-color: #999;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    </style>
+</head><body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="240" height="320"></canvas>
+    <div id="scoreBoard">Score: 0</div>
+    <div id="pauseScreen"> <!-- اضافه شده -->
+        PAUSED
+        <button id="resumeButton">RESUME</button>
+        <button id="pauseRestartButton">RESTART</button>
+    </div>
+    <div id="gameOverScreen">
+        Game Over!
+        <button id="restartButton">Restart</button>
+    </div>
+</div>
+<button id="pauseButton">PAUSE</button> <!-- اضافه شده -->
+
+<!-- دکمه‌های کنترل موبایل -->
+<div id="mobileControls">
+    <button class="controlBtn" id="leftBtn">←</button>
+    <button class="controlBtn" id="rightBtn">→</button>
+</div>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreBoard = document.getElementById('scoreBoard');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const pauseScreen = document.getElementById('pauseScreen'); // اضافه شده
+    const restartButton = document.getElementById('restartButton');
+    const pauseRestartButton = document.getElementById('pauseRestartButton'); // اضافه شده
+    const resumeButton = document.getElementById('resumeButton'); // اضافه شده
+    const pauseButton = document.getElementById('pauseButton'); // اضافه شده
+
+    // تنظیمات بازی
+    const ballRadius = 6;
+    const platformWidth = 40;
+    const platformHeight = 8;
+    const obstacleWidth = 30;
+    const obstacleHeight = 15;
+    let ballX = canvas.width / 2;
+    let ballY = canvas.height - 30;
+    let ballSpeedX = 3;
+    let ballSpeedY = -3;
+    let platformX = (canvas.width - platformWidth) / 2;
+    const platformSpeed = 8;
+    let obstacles = [];
+    let score = 0;
+    let gameRunning = false;
+    let gamePaused = false; // اضافه شده
+    let gameLoopInterval;    let lastTime = 0;
+
+    let platformDirection = 0;
+
+    function initGame() {
+        ballX = canvas.width / 2;
+        ballY = canvas.height - 30;
+        ballSpeedX = 3;
+        ballSpeedY = -3;
+        platformX = (canvas.width - platformWidth) / 2;
+        platformDirection = 0;
+        obstacles = [];
+        score = 0;
+        scoreBoard.textContent = "Score: " + score;
+        gameOverScreen.style.display = 'none';
+        pauseScreen.style.display = 'none'; // اضافه شده: مطمئن شو که وقتی بازی شروع می‌شه، صفحه توقف پنهانه
+
+        for (let i = 0; i < 5; i++) {
+            createObstacle();
+        }
+
+        gameRunning = true;
+        gamePaused = false; // اضافه شده: مطمئن شو که بازی بعد از شروع/ری‌استارت در حال اجرا و متوقف نیست
+    }
+
+    function drawGame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.beginPath();
+        ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.closePath();
+
+        ctx.fillStyle = "#0f0";
+        ctx.fillRect(platformX, canvas.height - platformHeight, platformWidth, platformHeight);
+
+        ctx.fillStyle = "#f00";
+        obstacles.forEach(obstacle => {
+            ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        });
+    }
+
+    function updateGame() {
+        if (!gameRunning || gamePaused) return; // اضافه شده: اگر بازی متوقف شده بود، کاری نکن
+
+        if (platformDirection === -1 && platformX > 0) {
+            platformX -= platformSpeed;
+        } else if (platformDirection === 1 && platformX < canvas.width - platformWidth) {
+            platformX += platformSpeed;        }
+
+        ballX += ballSpeedX;
+        ballY += ballSpeedY;
+
+        if (ballX + ballSpeedX > canvas.width - ballRadius || ballX + ballSpeedX < ballRadius) {
+            ballSpeedX = -ballSpeedX;
+        }
+        if (ballY + ballSpeedY < ballRadius) {
+            ballSpeedY = -ballSpeedY;
+        }
+        if (ballY + ballRadius > canvas.height) {
+            gameOver();
+            return;
+        }
+
+        if (
+            ballY + ballRadius > canvas.height - platformHeight &&
+            ballX > platformX &&
+            ballX < platformX + platformWidth
+        ) {
+            let hitPos = (ballX - (platformX + platformWidth / 2)) / (platformWidth / 2);
+            ballSpeedX = hitPos * 4;
+            ballSpeedY = -Math.abs(ballSpeedY);
+        }
+
+        for (let i = 0; i < obstacles.length; i++) {
+            const o = obstacles[i];
+            if (
+                ballX + ballRadius > o.x &&
+                ballX - ballRadius < o.x + o.width &&
+                ballY + ballRadius > o.y &&
+                ballY - ballRadius < o.y + o.height
+            ) {
+                score += 10;
+                scoreBoard.textContent = "Score: " + score;
+                obstacles.splice(i, 1);
+                ballSpeedY = -ballSpeedY;
+
+                if (obstacles.length === 0) {
+                    for (let j = 0; j < 5; j++) {
+                        createObstacle();
+                    }
+                }
+                break;
+            }
+        }
+
+        obstacles.forEach(obstacle => {
+            obstacle.y += obstacle.speed;            if (obstacle.y > canvas.height) {
+                obstacles.splice(obstacles.indexOf(obstacle), 1);
+                createObstacle();
+            }
+        });
+    }
+
+    function createObstacle() {
+        const width = obstacleWidth;
+        const height = obstacleHeight;
+        const x = Math.random() * (canvas.width - width);
+        const y = Math.random() * (canvas.height / 2);
+        const speed = 0.5 + Math.random() * 1.5;
+        obstacles.push({x, y, width, height, speed});
+    }
+
+    function gameOver() {
+        gameRunning = false;
+        clearInterval(gameLoopInterval);
+        gameOverScreen.style.display = 'flex';
+    }
+
+    // --- توابع جدید برای توقف و ادامه ---
+    function pauseGame() {
+        if (gameRunning && !gamePaused) { // فقط اگر در حال اجرا بود و متوقف نشده بود
+            gamePaused = true;
+            pauseScreen.style.display = 'flex'; // نمایش صفحه توقف
+        }
+    }
+
+    function resumeGame() {
+        if (gameRunning && gamePaused) { // فقط اگر در حال اجرا بود و متوقف شده بود
+            gamePaused = false;
+            pauseScreen.style.display = 'none'; // پنهان کردن صفحه توقف
+        }
+    }
+    // -----------------------------------
+
+    function gameLoop(timestamp) {
+        if (!gameRunning) return; // تغییر کرده: فقط اگر بازی در حال اجرا بود
+
+        const deltaTime = timestamp - lastTime;
+        lastTime = timestamp;
+
+        if (deltaTime > 1000 / 60) {
+             updateGame(); // تغییر کرده: فقط اگر بازی در حال اجرا و متوقف نشده بود
+             drawGame();
+        }
+        requestAnimationFrame(gameLoop);
+    }
+    document.addEventListener('keydown', e => {
+        if (!gameRunning || gamePaused) return; // اضافه شده: فقط اگر بازی در حال اجرا و متوقف نشده بود
+        if (e.key === 'ArrowLeft' && platformX > 0) {
+            platformDirection = -1;
+        } else if (e.key === 'ArrowRight' && platformX < canvas.width - platformWidth) {
+            platformDirection = 1;
+        }
+        // اضافه کردن کلید P برای توقف/ادامه
+        if (e.key === 'p' || e.key === 'P') {
+             if (gamePaused) {
+                 resumeGame();
+             } else {
+                 pauseGame();
+             }
+        }
+    });
+
+    document.addEventListener('keyup', e => {
+        if (['ArrowLeft', 'ArrowRight'].includes(e.key)) {
+             platformDirection = 0;
+        }
+    });
+
+    const leftBtn = document.getElementById('leftBtn');
+    const rightBtn = document.getElementById('rightBtn');
+
+    function setupButton(btn, direction) {
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gamePaused) { // فقط اگر بازی متوقف نشده بود
+                platformDirection = direction;
+            }
+            btn.classList.add('active');
+        });
+
+        btn.addEventListener('mousedown', () => {
+            if (!gamePaused) { // فقط اگر بازی متوقف نشده بود
+                platformDirection = direction;
+            }
+            btn.classList.add('active');
+        });
+
+        const stopMoving = () => {
+            platformDirection = 0;
+            btn.classList.remove('active');
+        };
+
+        btn.addEventListener('touchend', stopMoving);
+        btn.addEventListener('touchcancel', stopMoving);        btn.addEventListener('mouseup', stopMoving);
+        btn.addEventListener('mouseleave', stopMoving);
+    }
+
+    setupButton(leftBtn, -1);
+    setupButton(rightBtn, 1);
+
+    // --- مدیریت دکمه‌های جدید ---
+    pauseButton.addEventListener('click', () => {
+        if (gameRunning && !gamePaused) {
+            pauseGame();
+        } else if (gameRunning && gamePaused) {
+             resumeGame();
+        }
+    });
+
+    resumeButton.addEventListener('click', () => {
+        if (gameRunning && gamePaused) {
+            resumeGame();
+        }
+    });
+
+    restartButton.addEventListener('click', () => {
+        initGame();
+        clearInterval(gameLoopInterval);
+        lastTime = performance.now();
+        gameLoop(lastTime);
+    });
+
+    pauseRestartButton.addEventListener('click', () => { // اضافه شده
+        initGame();
+        clearInterval(gameLoopInterval);
+        lastTime = performance.now();
+        gameLoop(lastTime);
+    });
+    // ------------------------------
+
+    initGame();
+    lastTime = performance.now();
+    gameLoop(lastTime);
+</script>
+
+</body>
+  </html>
