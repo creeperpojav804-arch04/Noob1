@@ -96,11 +96,12 @@ const scoreEl = document.getElementById("score");
 let score = 0;
 let gameOver = false;
 let paused = false;
+let playerCarIndex = 0;
 
 const player = {
     x:145,
     y:420,
-    w:30,
+    w:42,
     h:55,
     speed:6
 };
@@ -119,6 +120,7 @@ function resetGame(){
 
     player.x = 145;
     player.y = 420;
+    playerCarIndex = randomCarIndex();
 
     for(let i=0;i<12;i++){
         roadLines.push({y:i*50});
@@ -127,26 +129,71 @@ function resetGame(){
     scoreEl.textContent = "امتیاز: 0";
 }
 
-resetGame();
+// =========================
+// 9 CAR IMAGE SLOTS
+// =========================
+// فقط نام فایل‌های عکس را اینجا عوض کن.
+// مثال: "cars/car1.png"
+const carSources = [
+    "assets/img/car1.png",  // عکس 1
+    "assets/img/car2.png",  // عکس 2
+    "assets/img/car3.png",  // عکس 3
+    "assets/img/car4.png",  // عکس 4
+    "assets/img/car5.png",  // عکس 5
+    "assets/img/car6.png",  // عکس 6
+    "assets/img/car7.png",  // عکس 7
+    "assets/img/car8.png",  // عکس 8
+    "assets/img/car9.png"   // عکس 9
+];
 
-function drawCar(x,y,color){
-    ctx.fillStyle = "rgba(0,0,0,.3)";
-    ctx.fillRect(x+3,y+3,30,55);
+const carImages = carSources.map(src => {
+    const img = new Image();
+    img.src = src;
+    return img;
+});
 
-    const g = ctx.createLinearGradient(x,y,x+30,y);
-    g.addColorStop(0,color);
-    g.addColorStop(.5,"#ffffff33");
-    g.addColorStop(1,color);
-
-    ctx.fillStyle = g;
-    ctx.fillRect(x,y,30,55);
-
-    ctx.fillStyle = "#8fe8ff";
-    ctx.fillRect(x+6,y+12,18,10);
+function randomCarIndex(){
+    return Math.floor(Math.random() * carImages.length);
 }
 
+// =========================
+// اندازه ماشین‌ها
+// =========================
+const CAR_WIDTH = 42;
+const CAR_HEIGHT = 55;
+
+// محدوده واقعی هر PNG.
+// عکس‌ها همچنان جداگانه در assets/img/ باقی می‌مانند.
+const carCrops = [
+    {sx:580, sy:188, sw:838, sh:1619}, // car1.png
+    {sx:101, sy:20, sw:157, sh:320},   // car2.png
+    {sx:169, sy:0, sw:262, sh:600},    // car3.png
+    {sx:115, sy:37, sw:129, sh:277},   // car4.png
+    {sx:164, sy:0, sw:273, sh:596},    // car5.png
+    {sx:0, sy:0, sw:238, sh:512},      // car6.png
+    {sx:0, sy:0, sw:817, sh:817},      // car7.png
+    {sx:115, sy:37, sw:129, sh:277},   // car8.png
+    {sx:0, sy:0, sw:635, sh:1280}      // car9.png
+];
+
+function drawCar(x,y,carIndex){
+    const img = carImages[carIndex];
+    const crop = carCrops[carIndex];
+
+    if(!img || !crop || !img.complete || img.naturalWidth <= 0) return;
+
+    ctx.drawImage(
+        img,
+        crop.sx, crop.sy, crop.sw, crop.sh,
+        x, y, CAR_WIDTH, CAR_HEIGHT
+    );
+}
+
+// منابع ماشین‌ها باید قبل از اولین resetGame ساخته شده باشند.
+resetGame();
+
 function spawnEnemy(){
-    const lanes = [55,145,235];
+    const lanes = [50,139,228];
 
     const laneIndex = Math.floor(Math.random()*3);
     const laneX = lanes[laneIndex];
@@ -160,7 +207,8 @@ function spawnEnemy(){
     enemies.push({
         x:laneX,
         y:-60,
-        speed:3.5 + Math.random()*1.5
+        speed:3.5 + Math.random()*1.5,
+        carIndex:randomCarIndex()
     });
 }
 
@@ -186,7 +234,7 @@ function checkInvisibleWalls(p){
 
             if(e.x < 100){
                 if(
-                    p.x < e.x + 30 &&
+                    p.x < e.x + CAR_WIDTH &&
                     p.x + p.w > wallWidth
                 ){
                     return true;
@@ -311,14 +359,14 @@ function draw(){
     drawCar(
         player.x,
         player.y,
-        "#00cc66"
+        playerCarIndex
     );
 
     enemies.forEach(enemy=>{
         drawCar(
             enemy.x,
             enemy.y,
-            "#cc2222"
+            enemy.carIndex
         );
     });
 
